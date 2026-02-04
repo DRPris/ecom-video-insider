@@ -6,6 +6,7 @@ A powerful MVP tool for analyzing TikTok/Instagram/YouTube Shorts videos and gen
 
 - **Video Metadata Extraction**: Fetch video data (views, likes, comments, shares) via Apify API
 - **AI-Powered Analysis**: Analyze video structure using Google Gemini 1.5 Flash API
+- **Speech Transcription**: Extract speech from videos with timestamps using OpenAI Whisper API
 - **Lazada Optimization**: Generate localized remake scripts for Lazada marketing
 - **Export Functionality**: Export analysis results in JSON and Markdown formats
 - **Password Protection**: Secure access with password authentication
@@ -13,8 +14,8 @@ A powerful MVP tool for analyzing TikTok/Instagram/YouTube Shorts videos and gen
 ## 🚀 Tech Stack
 
 - **Frontend**: Streamlit
-- **APIs**: Apify (TikTok Scraper), Google Generative AI (Gemini)
-- **Video Processing**: yt-dlp
+- **APIs**: Apify (TikTok Scraper), Google Generative AI (Gemini), OpenAI (Whisper)
+- **Video Processing**: yt-dlp, ffmpeg
 - **Language**: Python 3.11
 
 ## 📦 Installation
@@ -44,6 +45,7 @@ Edit `.env`:
 ```
 APIFY_API_TOKEN=your_apify_token_here
 GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here  # Optional, for better transcription
 ```
 
 ### 4. Run the application
@@ -75,6 +77,7 @@ git push origin main
 ```toml
 APIFY_API_TOKEN = "your_apify_token_here"
 GEMINI_API_KEY = "your_gemini_api_key_here"
+OPENAI_API_KEY = "your_openai_api_key_here"  # Optional, for better transcription
 APP_PASSWORD = "your_custom_password"
 ```
 
@@ -98,11 +101,11 @@ APP_PASSWORD = "your_secure_password"
 
 1. Enter the access password
 2. Paste a TikTok video URL
-3. Click "🔍 Analyze Now"
+3. Click "🚀 Analyze Now"
 4. View results in three tabs:
    - **Remake Brief**: High-level adaptation suggestions
    - **Logic Breakdown**: Detailed structure analysis
-   - **Raw Data**: Complete JSON output
+   - **口播摘录**: Speech transcript with timestamps
 5. Export results using the download buttons
 
 ## 🛠️ Project Structure
@@ -129,6 +132,11 @@ ecom-video-insider/
 ### Google Gemini API Key
 - Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
 - Create a new API key
+
+### OpenAI API Key (Optional, for better transcription)
+- Visit [OpenAI Platform](https://platform.openai.com/api-keys)
+- Create a new API key
+- See [WHISPER_API_SETUP.md](./WHISPER_API_SETUP.md) for detailed setup guide
 
 ## 🤝 Contributing
 

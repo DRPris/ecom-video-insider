@@ -13,6 +13,7 @@ import yt_dlp
 from pathlib import Path
 from typing import Dict, Optional, List
 import google.generativeai as genai
+from openai import OpenAI
 from dotenv import load_dotenv
 
 from .prompts import VIDEO_ANALYSIS_SYSTEM_PROMPT
@@ -76,6 +77,14 @@ class VideoAnalyzer:
         # 临时文件夹（使用系统临时目录，兼容 Streamlit Cloud）
         self.temp_dir = Path(tempfile.gettempdir()) / 'ecom_video_insider'
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 初始化 OpenAI 客户端（用于 Whisper API）
+        openai_key = os.getenv('OPENAI_API_KEY')
+        self.openai_client = OpenAI(api_key=openai_key) if openai_key else None
+        if self.openai_client:
+            print("✅ OpenAI Whisper API 已启用")
+        else:
+            print("⚠️ OpenAI API Key 未配置，将使用 Gemini 进行转录")
     
     def download_video_with_ytdlp(self, video_url: str) -> str:
         """
@@ -234,6 +243,95 @@ class VideoAnalyzer:
             print(f"❌ 音频提取失败: {e.stderr.decode()}")
             raise ValueError(f"音频提取失败: {str(e)}")
     
+    def transcribe_audio_with_whisper(self, audio_path: str) -> List[Dict]:
+        """
+        使用 OpenAI Whisper API 进行音频转录（带时间戳）
+        
+        Args:
+            audio_path: 音频文件路径
+            
+        Returns:
+            转录结果列表，格式: [{"timestamp": "00:00", "text": "..."}]
+            如果失败返回空列表
+        """
+        print(f"🎤 使用 Whisper API 进行语音转录: {audio_path}")
+        
+        try:
+            # 检查音频文件是否存在
+            if not os.path.exists(audio_path):
+                print(f"❌ 音频文件不存在: {audio_path}")
+                return []
+            
+            # 调用 Whisper API
+            print("📤 正在上传音频到 Whisper API...")
+            with open(audio_path, 'rb') as audio_file:
+                response = self.openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="verbose_json",  # 获取带时间戳的详细结果
+                    timestamp_granularities=["segment"]  # 按句子/段落分段
+                )
+            
+            print(f"✅ Whisper API 转录成功")
+            
+            # 解析 Whisper 响应
+            transcript = []
+            if hasattr(response, 'segments') and response.segments:
+                for segment in response.segments:
+                    # 将秒转换为 MM:SS 格式
+                    start_time = int(segment['start'])
+                    minutes = start_time // 60
+                    seconds = start_time % 60
+                    timestamp = f"{minutes:02d}:{seconds:02d}"
+                    
+                    transcript.append({
+                        "timestamp": timestamp,
+                        "text": segment['text'].strip()
+                    })
+                
+                print(f"✅ 转录完成，共 {len(transcript)} 条记录")
+                for item in transcript[:3]:  # 打印前3条
+                    print(f"  [{item['timestamp']}] {item['text'][:50]}...")
+            else:
+                # 如果没有 segments，使用整体文本
+                if hasattr(response, 'text') and response.text:
+                    transcript.append({
+                        "timestamp": "00:00",
+                        "text": response.text.strip()
+                    })
+                    print(f"✅ 转录完成（无时间戳分段）")
+                else:
+                    print("⚠️ 未检测到语音内容")
+            
+            return transcript
+            
+        except Exception as e:
+            print(f"❌ Whisper 转录失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def transcribe_audio(self, audio_path: str) -> List[Dict]:
+        """
+        音频转录（自动选择最佳方法）
+        
+        优先使用 OpenAI Whisper API（更准确），如果不可用则使用 Gemini
+        
+        Args:
+            audio_path: 音频文件路径
+            
+        Returns:
+            转录结果列表，格式: [{"timestamp": "00:00", "text": "..."}]
+        """
+        # 优先使用 Whisper API
+        if self.openai_client:
+            transcript = self.transcribe_audio_with_whisper(audio_path)
+            if transcript:  # 如果成功，直接返回
+                return transcript
+            print("⚠️ Whisper 转录失败，尝试使用 Gemini...")
+        
+        # 备选：使用 Gemini
+        return self.transcribe_audio_with_gemini(audio_path)
     def transcribe_audio_with_gemini(self, audio_path: str) -> List[Dict]:
         """
         使用 Gemini API 进行音频转录（带时间戳）

@@ -7,6 +7,9 @@ apify-client==1.7.1
 # Google Generative AI SDK for video analysis
 google-generativeai==0.8.3
 
+# OpenAI SDK for Whisper API (speech transcription)
+openai>=1.0.0
+
 # Streamlit for UI
 streamlit==1.39.0
 

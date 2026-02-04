@@ -227,7 +227,7 @@ if analyze_btn:
             try:
                 audio_path = analyzer.extract_audio(video_path)
                 status_text.info("🎬 分析中... 正在转录语音")
-                transcript = analyzer.transcribe_audio_with_gemini(audio_path)
+                transcript = analyzer.transcribe_audio(audio_path)
             except Exception as e:
                 print(f"⚠️ 转录失败: {str(e)}")
                 transcript = []
