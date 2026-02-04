@@ -6,6 +6,7 @@ Sprint 2: E-Com Video Insider
 import os
 import json
 import time
+import tempfile
 import requests
 import yt_dlp
 from pathlib import Path
@@ -71,8 +72,8 @@ class VideoAnalyzer:
         # 保存系统提示词，稍后与用户提示词组合使用
         self.system_prompt = VIDEO_ANALYSIS_SYSTEM_PROMPT
         
-        # 临时文件夹
-        self.temp_dir = Path('/home/ubuntu/ecom-video-insider/data/temp')
+        # 临时文件夹（使用系统临时目录，兼容 Streamlit Cloud）
+        self.temp_dir = Path(tempfile.gettempdir()) / 'ecom_video_insider'
         self.temp_dir.mkdir(parents=True, exist_ok=True)
     
     def download_video_with_ytdlp(self, video_url: str) -> str:
