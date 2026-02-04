@@ -243,69 +243,108 @@ class VideoAnalyzer:
             
         Returns:
             转录结果列表，格式: [{"timestamp": "00:00", "text": "..."}]
+            如果失败返回空列表
         """
         print(f"🎬 开始语音转录: {audio_path}")
         
         try:
+            # 检查音频文件是否存在
+            if not os.path.exists(audio_path):
+                print(f"❌ 音频文件不存在: {audio_path}")
+                return []
+            
             # 上传音频到 Gemini
+            print(f"📤 正在上传音频...")
             audio_file = genai.upload_file(path=audio_path)
-            print(f"✅ 音频上传成功")
+            print(f"✅ 音频上传成功: {audio_file.name}")
             
             # 等待处理
-            while audio_file.state.name == "PROCESSING":
-                time.sleep(2)
+            max_wait = 30  # 最多等待 30 秒
+            wait_count = 0
+            while audio_file.state.name == "PROCESSING" and wait_count < max_wait:
+                time.sleep(1)
                 audio_file = genai.get_file(audio_file.name)
+                wait_count += 1
+            
+            if audio_file.state.name == "PROCESSING":
+                print("❌ 音频处理超时")
+                return []
+            
+            print(f"✅ 音频处理完成，状态: {audio_file.state.name}")
             
             # 调用 Gemini 进行转录
-            prompt = """请将这段音频转录为文字，并按照以下 JSON 格式返回：
+            prompt = """请听这段音频，并将其中的语音内容转录为文字。
 
+请按照以下 JSON 格式返回：
+```json
 {
   "transcript": [
-    {"timestamp": "00:00", "text": "第一句话"},
-    {"timestamp": "00:05", "text": "第二句话"},
-    ...
+    {"timestamp": "00:00", "text": "第一句话的内容"},
+    {"timestamp": "00:05", "text": "第二句话的内容"}
   ]
 }
+```
 
-请确保：
+注意：
 1. 时间戳格式为 MM:SS
-2. 每句话单独一行
-3. 保持原始语言（中文/英文）
-4. 只返回 JSON，不要其他内容"""
+2. 每 5-10 秒分一段
+3. 保持原始语言
+4. 如果没有语音，返回空数组
+5. 只返回 JSON，不要其他解释"""
             
+            print("🤖 正在调用 Gemini API 进行转录...")
             response = self.model.generate_content([audio_file, prompt])
             response_text = response.text.strip()
             
+            print(f"📝 Gemini 响应: {response_text[:200]}...")  # 打印前 200 字符
+            
             # 解析 JSON
+            transcript = []
             try:
                 # 尝试直接解析
                 result = json.loads(response_text)
                 transcript = result.get('transcript', [])
-            except json.JSONDecodeError:
+                print(f"✅ JSON 解析成功，共 {len(transcript)} 条记录")
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON 解析失败: {str(e)}，尝试提取...")
                 # 提取 JSON 代码块
                 import re
                 json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
                 if json_match:
                     result = json.loads(json_match.group(1))
                     transcript = result.get('transcript', [])
+                    print(f"✅ 从代码块提取成功，共 {len(transcript)} 条记录")
                 else:
                     # 查找第一个 { 和最后一个 }
                     start_idx = response_text.find('{')
                     end_idx = response_text.rfind('}')
                     if start_idx != -1 and end_idx != -1:
                         json_str = response_text[start_idx:end_idx+1]
-                        result = json.loads(json_str)
-                        transcript = result.get('transcript', [])
+                        try:
+                            result = json.loads(json_str)
+                            transcript = result.get('transcript', [])
+                            print(f"✅ 手动提取成功，共 {len(transcript)} 条记录")
+                        except:
+                            print("❌ 无法解析提取的 JSON")
                     else:
-                        print("⚠️ 无法解析转录结果，返回原始文本")
-                        transcript = [{"timestamp": "00:00", "text": response_text}]
+                        print("❌ 响应中未找到 JSON 格式")
             
-            print(f"✅ 转录完成，共 {len(transcript)} 条记录")
-            return transcript
+            # 验证转录结果
+            if transcript and len(transcript) > 0:
+                # 过滤掉错误信息
+                valid_transcript = [t for t in transcript if '转录失败' not in t.get('text', '')]
+                if valid_transcript:
+                    print(f"✅ 转录成功，共 {len(valid_transcript)} 条有效记录")
+                    return valid_transcript
+            
+            print("⚠️ 未检测到语音内容")
+            return []
             
         except Exception as e:
             print(f"❌ 转录失败: {str(e)}")
-            return [{"timestamp": "00:00", "text": f"转录失败: {str(e)}"}]
+            import traceback
+            traceback.print_exc()
+            return []
     
     def analyze_video_structure(self, video_url: str, cleanup: bool = True) -> Dict:
         """
