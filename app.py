@@ -209,94 +209,116 @@ if analyze_btn:
         st.error("❌ 请至少配置 Gemini API Key 或 API Base URL 之一")
     else:
         try:
+            # 创建统一进度条
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
             # 阶段 1: 获取视频元数据（点赞、评论等）
-            with st.spinner("📥 Step 1/3: Fetching video metadata from TikTok..."):
-                fetcher = TikTokFetcher(api_token=apify_token)
-                video_data = fetcher.fetch_video_data(video_url)
-                
-                st.success(f"✅ Metadata retrieved: {video_data['author']} | {video_data['views']:,} views")
-                st.info("📊 元数据获取成功，现在开始下载视频...")
+            status_text.info("🔍 分析中... 正在获取视频元数据")
+            progress_bar.progress(10)
+            
+            fetcher = TikTokFetcher(api_token=apify_token)
+            video_data = fetcher.fetch_video_data(video_url)
+            
+            progress_bar.progress(25)
+            status_text.success(f"✅ 元数据获取成功: {video_data['author']} | {video_data['views']:,} 次观看")
+            time.sleep(0.3)
             
             # 阶段 2: 下载视频并分析
-            with st.spinner("🤖 Step 2/3: Downloading video and analyzing with Gemini AI..."):
-                # 传入 api_base 参数（如果提供）
-                analyzer = VideoAnalyzer(
-                    api_key=gemini_key if gemini_key else None,
-                    api_base=gemini_base if gemini_base else None
-                )
-                
-                # 使用 yt-dlp 下载视频并分析
-                st.info("📥 正在使用 yt-dlp 下载视频...")
-                video_path = analyzer.download_video_with_ytdlp(video_url)
-                st.success(f"✅ 视频下载完成")
-                
-                # 上传到 Gemini 并分析
-                st.info("🚀 正在上传到 Gemini API 并分析...")
-                video_file = analyzer.upload_to_gemini(video_path)
-                
-                # 调用 Gemini 进行分析
-                # 组合系统提示词和用户提示词
-                combined_prompt = f"""{analyzer.system_prompt}
+            status_text.info("🔍 分析中... 正在下载视频")
+            progress_bar.progress(30)
+            
+            # 传入 api_base 参数（如果提供）
+            analyzer = VideoAnalyzer(
+                api_key=gemini_key if gemini_key else None,
+                api_base=gemini_base if gemini_base else None
+            )
+            
+            # 使用 yt-dlp 下载视频并分析
+            video_path = analyzer.download_video_with_ytdlp(video_url)
+            progress_bar.progress(50)
+            status_text.success("✅ 视频下载完成")
+            time.sleep(0.3)
+            
+            # 上传到 Gemini 并分析
+            status_text.info("🔍 分析中... 正在上传到 Gemini API")
+            progress_bar.progress(60)
+            video_file = analyzer.upload_to_gemini(video_path)
+            progress_bar.progress(70)
+            
+            # 调用 Gemini 进行分析
+            status_text.info("🤖 分析中... AI 正在分析视频内容")
+            progress_bar.progress(75)
+            # 组合系统提示词和用户提示词
+            combined_prompt = f"""{analyzer.system_prompt}
 
 ---
 
 Now, please analyze the following video according to the framework above.
 Return your analysis in valid JSON format.
 """
-                response = analyzer.model.generate_content([video_file, combined_prompt])
-                
-                # 解析 JSON 响应
-                # Gemini 可能返回的格式:
-                # 1. 纯 JSON: {"video_structure": ...}
-                # 2. Markdown 代码块: ```json\n{...}\n```
-                # 3. 带文字说明: Here is the analysis:\n{...}
-                
-                response_text = response.text.strip()
-                
-                # 尝试提取 JSON
-                try:
-                    # 方法 1: 直接解析
-                    analysis_result = json.loads(response_text)
-                except json.JSONDecodeError:
-                    # 方法 2: 提取 Markdown 代码块中的 JSON
-                    import re
-                    json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
-                    if json_match:
-                        analysis_result = json.loads(json_match.group(1))
+            response = analyzer.model.generate_content([video_file, combined_prompt])
+            
+            # 解析 JSON 响应
+            # Gemini 可能返回的格式:
+            # 1. 纯 JSON: {"video_structure": ...}
+            # 2. Markdown 代码块: ```json\n{...}\n```
+            # 3. 带文字说明: Here is the analysis:\n{...}
+            
+            response_text = response.text.strip()
+            
+            # 尝试提取 JSON
+            try:
+                # 方法 1: 直接解析
+                analysis_result = json.loads(response_text)
+            except json.JSONDecodeError:
+                # 方法 2: 提取 Markdown 代码块中的 JSON
+                import re
+                json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    analysis_result = json.loads(json_match.group(1))
+                else:
+                    # 方法 3: 查找第一个 { 和最后一个 }
+                    start_idx = response_text.find('{')
+                    end_idx = response_text.rfind('}')
+                    if start_idx != -1 and end_idx != -1:
+                        json_str = response_text[start_idx:end_idx+1]
+                        analysis_result = json.loads(json_str)
                     else:
-                        # 方法 3: 查找第一个 { 和最后一个 }
-                        start_idx = response_text.find('{')
-                        end_idx = response_text.rfind('}')
-                        if start_idx != -1 and end_idx != -1:
-                            json_str = response_text[start_idx:end_idx+1]
-                            analysis_result = json.loads(json_str)
-                        else:
-                            # 如果都失败，显示原始响应
-                            st.error("❌ AI 返回的内容不是有效的 JSON 格式")
-                            st.text_area("原始响应", response_text, height=300)
-                            st.stop()
-                
-                st.success("✅ AI analysis complete!")
+                        # 如果都失败，显示原始响应
+                        st.error("❌ AI 返回的内容不是有效的 JSON 格式")
+                        st.text_area("原始响应", response_text, height=300)
+                        st.stop()
+            
+            progress_bar.progress(90)
+            status_text.success("✅ AI 分析完成")
+            time.sleep(0.3)
             
             # 阶段 3: 保存结果
-            with st.spinner("💾 Step 3/3: Generating report..."):
-                time.sleep(0.5)  # 视觉效果
-                
-                # 构建完整报告
-                full_report = {
-                    'video_data': video_data,
-                    'analysis': analysis_result,
-                    'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
-                }
-                
-                # 保存到 session state
-                st.session_state.current_result = full_report
-                st.session_state.analysis_history.append({
-                    'author': video_data['author'],
-                    'timestamp': full_report['timestamp']
-                })
-                
-                st.success("✅ Report generated!")
+            status_text.info("📊 分析中... 正在生成报告")
+            progress_bar.progress(95)
+            
+            # 构建完整报告
+            full_report = {
+                'video_data': video_data,
+                'analysis': analysis_result,
+                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            # 保存到 session state
+            st.session_state.current_result = full_report
+            st.session_state.analysis_history.append({
+                'author': video_data['author'],
+                'timestamp': full_report['timestamp']
+            })
+            
+            progress_bar.progress(100)
+            status_text.success("✅ 分析完成！报告已生成")
+            time.sleep(0.5)
+            
+            # 清除进度条
+            progress_bar.empty()
+            status_text.empty()
             
         except Exception as e:
             st.error(f"❌ 分析失败: {str(e)}")
