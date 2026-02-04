@@ -101,6 +101,10 @@ class VideoAnalyzer:
             'no_warnings': False,
             'extract_flat': False,
             'nocheckcertificate': True,
+            # YouTube 特定配置（绕过 403 错误）
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'referer': 'https://www.youtube.com/',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
         
         try:

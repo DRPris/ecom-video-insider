@@ -333,8 +333,42 @@ Return your analysis in valid JSON format.
             status_text.empty()
             
         except Exception as e:
-            st.error(f"❌ 分析失败: {str(e)}")
-            st.exception(e)
+            error_msg = str(e)
+            
+            # 清除进度条
+            progress_bar.empty()
+            status_text.empty()
+            
+            # 根据错误类型提供友好的提示
+            if "403" in error_msg or "Forbidden" in error_msg:
+                st.error("❌ **视频下载失败：访问被拒绝**")
+                st.warning("""
+                **可能的原因：**
+                - YouTube 对自动化下载有限制
+                - 视频可能有地区限制或年龄限制
+                - 服务器 IP 被 YouTube 限制
+                
+                **解决方案：**
+                1. 尝试使用 **TikTok** 视频链接（推荐）
+                2. 或者稍后再试
+                """)
+            elif "video_data" in error_msg:
+                st.error("❌ **元数据获取失败**")
+                st.warning("""
+                **可能的原因：**
+                - Apify API Token 无效或配额不足
+                - 视频链接格式不正确
+                
+                **解决方案：**
+                1. 检查侧边栏的 Apify API Token 是否正确
+                2. 确认视频链接是 TikTok 视频
+                """)
+            else:
+                st.error(f"❌ **分析失败**: {error_msg}")
+            
+            # 显示详细错误信息（可折叠）
+            with st.expander("🔍 查看详细错误信息"):
+                st.exception(e)
 
 # ---------------------------------------------------------
 # 7. Result Dashboard (核心展示区)
