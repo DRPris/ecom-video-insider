@@ -476,7 +476,7 @@ if st.session_state.current_result:
 st.divider()
 st.markdown("""
 <div style="text-align: center; color: #666; font-size: 12px;">
-    <p>E-Com Video Insider v1.0.0 | Built with ❤️ for Lazada Team</p>
+    <p>E-Com Video Insider v1.0.0 | Created by DorisP</p>
     <p>Powered by Apify + Google Gemini 1.5 Pro</p>
 </div>
 """, unsafe_allow_html=True)
