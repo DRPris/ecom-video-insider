@@ -240,6 +240,17 @@ if analyze_btn:
             status_text.success("✅ 视频下载完成")
             time.sleep(0.3)
             
+            # 提取音频并转录
+            status_text.info("🎵 分析中... 正在提取音频")
+            progress_bar.progress(55)
+            try:
+                audio_path = analyzer.extract_audio(video_path)
+                status_text.info("🎬 分析中... 正在转录语音")
+                transcript = analyzer.transcribe_audio_with_gemini(audio_path)
+            except Exception as e:
+                print(f"⚠️ 转录失败: {str(e)}")
+                transcript = []
+            
             # 上传到 Gemini 并分析
             status_text.info("🔍 分析中... 正在上传到 Gemini API")
             progress_bar.progress(60)
@@ -302,6 +313,7 @@ Return your analysis in valid JSON format.
             full_report = {
                 'video_data': video_data,
                 'analysis': analysis_result,
+                'transcript': transcript,
                 'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
             }
             
@@ -411,7 +423,7 @@ if st.session_state.current_result:
         st.divider()
         
         # Tabs for detailed view
-        tab1, tab2, tab3 = st.tabs(["🎬 Remake Brief (执行脚本)", "🧠 Logic Breakdown (逻辑拆解)", "🔍 Raw Data"])
+        tab1, tab2, tab3 = st.tabs(["🎬 Remake Brief (执行脚本)", "🧠 Logic Breakdown (逻辑拆解)", "🎬 口播摘录"])
         
         with tab1:
             st.subheader("🎥 Ready-to-Shoot Script")
@@ -441,7 +453,18 @@ if st.session_state.current_result:
                 st.write(analysis['creative_insight']['visual_style'])
         
         with tab3:
-            st.json(result)
+            st.subheader("🎬 视频口播文稿（带时间戳）")
+            
+            transcript = result.get('transcript', [])
+            
+            if transcript and len(transcript) > 0:
+                # 显示转录结果
+                for item in transcript:
+                    timestamp = item.get('timestamp', '00:00')
+                    text = item.get('text', '')
+                    st.markdown(f"**[{timestamp}]** {text}")
+            else:
+                st.info("🔇 未检测到语音内容，或转录失败。该视频可能是纯音乐或无配音。")
     
     # ---------------------------------------------------------
     # 导出功能
@@ -449,20 +472,10 @@ if st.session_state.current_result:
     st.divider()
     st.subheader("📥 Export Report")
     
-    export_col1, export_col2, export_col3 = st.columns(3)
+    export_col1, export_col2, export_col3, export_col4 = st.columns(4)
     
     with export_col1:
-        # 导出 JSON
-        json_str = json.dumps(result, indent=2, ensure_ascii=False)
-        st.download_button(
-            label="📄 Download JSON",
-            data=json_str,
-            file_name=f"analysis_{video_data['author']}_{int(time.time())}.json",
-            mime="application/json"
-        )
-    
-    with export_col2:
-        # 导出 Markdown 脚本
+        # 导出分析报告 (Markdown)
         markdown_script = f"""# Video Analysis Report
 
 ## Original Video
@@ -489,8 +502,42 @@ if st.session_state.current_result:
             mime="text/markdown"
         )
     
+    with export_col2:
+        # 导出口播文稿
+        transcript = result.get('transcript', [])
+        transcript_text = "# 视频口播文稿\n\n"
+        if transcript:
+            for item in transcript:
+                transcript_text += f"**[{item.get('timestamp', '00:00')}]** {item.get('text', '')}\n\n"
+        else:
+            transcript_text += "未检测到语音内容"
+        
+        st.download_button(
+            label="🎬 Download Transcript",
+            data=transcript_text,
+            file_name=f"transcript_{video_data['author']}_{int(time.time())}.md",
+            mime="text/markdown"
+        )
+    
     with export_col3:
-        st.button("🔄 Analyze Another Video", on_click=lambda: st.session_state.update({'current_result': None}))
+        # 占位符（暂时空着）
+        st.write("")  # 保持布局对齐
+    
+    with export_col4:
+        # 导出 Raw Data (JSON)
+        json_str = json.dumps(result, indent=2, ensure_ascii=False)
+        st.download_button(
+            label="📊 Download Raw Data",
+            data=json_str,
+            file_name=f"raw_data_{video_data['author']}_{int(time.time())}.json",
+            mime="application/json"
+        )
+    
+    # 分析另一个视频按钮（单独一行）
+    st.divider()
+    if st.button("🔄 Analyze Another Video", use_container_width=True):
+        st.session_state.current_result = None
+        st.rerun()
 
 # ---------------------------------------------------------
 # 8. Footer

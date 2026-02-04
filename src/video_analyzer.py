@@ -7,10 +7,11 @@ import os
 import json
 import time
 import tempfile
+import subprocess
 import requests
 import yt_dlp
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -195,6 +196,112 @@ class VideoAnalyzer:
         except Exception as e:
             print(f"❌ 视频上传或处理失败: {str(e)}")
             raise
+    
+    def extract_audio(self, video_path: str) -> str:
+        """
+        从视频中提取音频
+        
+        Args:
+            video_path: 视频文件路径
+            
+        Returns:
+            音频文件路径
+        """
+        print(f"🎵 提取音频: {video_path}")
+        
+        audio_path = str(Path(video_path).with_suffix('.mp3'))
+        
+        try:
+            # 使用 ffmpeg 提取音频
+            subprocess.run([
+                'ffmpeg', '-i', video_path,
+                '-vn',  # 不处理视频
+                '-acodec', 'libmp3lame',  # 使用 MP3 编码
+                '-ar', '16000',  # 16kHz 采样率（适合 ASR）
+                '-ac', '1',  # 单声道
+                '-y',  # 覆盖输出文件
+                audio_path
+            ], check=True, capture_output=True)
+            
+            print(f"✅ 音频提取完成: {audio_path}")
+            return audio_path
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ 音频提取失败: {e.stderr.decode()}")
+            raise ValueError(f"音频提取失败: {str(e)}")
+    
+    def transcribe_audio_with_gemini(self, audio_path: str) -> List[Dict]:
+        """
+        使用 Gemini API 进行音频转录（带时间戳）
+        
+        Args:
+            audio_path: 音频文件路径
+            
+        Returns:
+            转录结果列表，格式: [{"timestamp": "00:00", "text": "..."}]
+        """
+        print(f"🎬 开始语音转录: {audio_path}")
+        
+        try:
+            # 上传音频到 Gemini
+            audio_file = genai.upload_file(path=audio_path)
+            print(f"✅ 音频上传成功")
+            
+            # 等待处理
+            while audio_file.state.name == "PROCESSING":
+                time.sleep(2)
+                audio_file = genai.get_file(audio_file.name)
+            
+            # 调用 Gemini 进行转录
+            prompt = """请将这段音频转录为文字，并按照以下 JSON 格式返回：
+
+{
+  "transcript": [
+    {"timestamp": "00:00", "text": "第一句话"},
+    {"timestamp": "00:05", "text": "第二句话"},
+    ...
+  ]
+}
+
+请确保：
+1. 时间戳格式为 MM:SS
+2. 每句话单独一行
+3. 保持原始语言（中文/英文）
+4. 只返回 JSON，不要其他内容"""
+            
+            response = self.model.generate_content([audio_file, prompt])
+            response_text = response.text.strip()
+            
+            # 解析 JSON
+            try:
+                # 尝试直接解析
+                result = json.loads(response_text)
+                transcript = result.get('transcript', [])
+            except json.JSONDecodeError:
+                # 提取 JSON 代码块
+                import re
+                json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    result = json.loads(json_match.group(1))
+                    transcript = result.get('transcript', [])
+                else:
+                    # 查找第一个 { 和最后一个 }
+                    start_idx = response_text.find('{')
+                    end_idx = response_text.rfind('}')
+                    if start_idx != -1 and end_idx != -1:
+                        json_str = response_text[start_idx:end_idx+1]
+                        result = json.loads(json_str)
+                        transcript = result.get('transcript', [])
+                    else:
+                        print("⚠️ 无法解析转录结果，返回原始文本")
+                        transcript = [{"timestamp": "00:00", "text": response_text}]
+            
+            print(f"✅ 转录完成，共 {len(transcript)} 条记录")
+            return transcript
+            
+        except Exception as e:
+            print(f"❌ 转录失败: {str(e)}")
+            return [{"timestamp": "00:00", "text": f"转录失败: {str(e)}"}]
     
     def analyze_video_structure(self, video_url: str, cleanup: bool = True) -> Dict:
         """
