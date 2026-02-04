@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 后端 API 服务
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ecom-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_BASE=${GEMINI_API_BASE}
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data  # 持久化临时文件
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 前端 Streamlit 服务（安全版本）
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecom-frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_API_URL=http://backend:8000
+    restart: unless-stopped
+    command: streamlit run app_secure.py --server.port 8501 --server.address 0.0.0.0
+
+networks:
+  default:
+    name: ecom-network
