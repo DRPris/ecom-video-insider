@@ -139,39 +139,20 @@ if 'current_result' not in st.session_state:
     st.session_state.current_result = None
 
 # ---------------------------------------------------------
-# 4. Sidebar (侧边栏 - 设置与历史)
+# 4. Sidebar (侧边栏 - 历史记录)
 # ---------------------------------------------------------
+# 直接从 Streamlit Secrets 读取 API Keys
+apify_token = st.secrets.get('APIFY_API_TOKEN', '')
+gemini_key = st.secrets.get('GEMINI_API_KEY', '')
+gemini_base = st.secrets.get('GEMINI_API_BASE', '')
+
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    
-    # API Key 配置
-    apify_token = st.text_input(
-        "Apify API Token", 
-        type="password",
-        value=os.getenv('APIFY_API_TOKEN', ''),
-        help="从 https://console.apify.com/ 获取"
-    )
-    
-    gemini_key = st.text_input(
-        "Gemini API Key", 
-        type="password",
-        value=os.getenv('GEMINI_API_KEY', ''),
-        help="API Key 或 KIE API Token"
-    )
-    
-    gemini_base = st.text_input(
-        "Gemini API Base URL (可选)",
-        value=os.getenv('GEMINI_API_BASE', ''),
-        placeholder="https://your-kie-api-endpoint.com/v1",
-        help="如果使用 KIE API 或其他代理服务，请输入完整的 API Base URL"
-    )
-    
-    st.info("💡 Tip: Use a video under 2 minutes for best results.")
+    st.header("🕒 History")
+    st.caption("💡 Tip: Use a video under 2 minutes for best results.")
     
     st.divider()
     
     # 历史记录
-    st.subheader("🕒 History")
     if st.session_state.analysis_history:
         for i, item in enumerate(reversed(st.session_state.analysis_history[-5:])):
             st.text(f"• {item['author']} - {item['timestamp']}")
