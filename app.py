@@ -246,8 +246,18 @@ if analyze_btn:
 
 ---
 
-Now, please analyze the following video according to the framework above.
-Return your analysis in valid JSON format.
+# YOUR TASK NOW
+
+**WATCH THE VIDEO ABOVE CAREFULLY.**
+
+Then analyze it according to the framework provided.
+
+**IMPORTANT:**
+- Your analysis MUST be based on what you ACTUALLY see and hear in this specific video
+- Do NOT use generic examples or make up content
+- Describe the REAL product, REAL words spoken, and REAL visuals shown
+
+Return your analysis in valid JSON format ONLY (no markdown, no explanations).
 """
             response = analyzer.model.generate_content([video_file, combined_prompt])
             
@@ -426,10 +436,23 @@ if st.session_state.current_result:
     with right_col:
         st.subheader("🤖 AI Analysis Results")
         
+        # 支持新旧两种 JSON 结构
+        video_meta = analysis.get('video_content_summary', analysis.get('video_metadata', {}))
+        
+        # 显示视频内容摘要（新结构）
+        if 'what_is_this_video_about' in video_meta:
+            st.markdown(f"""
+            <div class="metric-card" style="background-color: #fff3cd; border-left-color: #ffc107;">
+                <b>📝 视频内容摘要:</b><br>
+                {video_meta['what_is_this_video_about']}
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+        
         # Top Row: Metrics
         meta_col1, meta_col2, meta_col3 = st.columns(3)
         with meta_col1:
-            st.markdown(f"""<div class="metric-card"><b>Sentiment:</b><br>{analysis['video_metadata']['estimated_sentiment']}</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="metric-card"><b>Sentiment:</b><br>{video_meta.get('estimated_sentiment', 'N/A')}</div>""", unsafe_allow_html=True)
         with meta_col2:
             st.markdown(f"""<div class="metric-card"><b>Hook Type:</b><br>{analysis['structure_breakdown']['hook_type']}</div>""", unsafe_allow_html=True)
         with meta_col3:

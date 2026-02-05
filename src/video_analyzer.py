@@ -61,13 +61,13 @@ class VideoAnalyzer:
             genai.configure(api_key=self.api_key)
             print("✅ 使用 Google 官方 API")
         
-        # 使用 Gemini Flash Latest（支持长视频输入，更高的免费配额）
+        # 使用 Gemini 1.5 Pro（更强的视频理解能力）
+        # Pro 版本在视频分析任务上准确性更高，减少幻觉
         # 注意: 移除 system_instruction 以兼容 Google AI Studio 的稳定版 API (v1)
-        # Flash 版本比 Pro 版本更快，配额更高，质量足够好
         self.model = genai.GenerativeModel(
-            model_name='gemini-flash-latest',
+            model_name='gemini-1.5-pro-latest',
             generation_config={
-                'temperature': 0.7,
+                'temperature': 0.3,  # 降低温度以提高准确性
             }
         )
         
