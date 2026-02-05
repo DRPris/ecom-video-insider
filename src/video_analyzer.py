@@ -80,10 +80,21 @@ class VideoAnalyzer:
         
         # 初始化 OpenAI 客户端（用于 Whisper API）
         openai_key = os.getenv('OPENAI_API_KEY')
-        self.openai_client = OpenAI(api_key=openai_key) if openai_key else None
-        if self.openai_client:
-            print("✅ OpenAI Whisper API 已启用")
+        openai_base = os.getenv('OPENAI_API_BASE')  # 支持第三方代理
+        
+        if openai_key:
+            # 如果有自定义 base_url，使用第三方代理
+            if openai_base:
+                self.openai_client = OpenAI(
+                    api_key=openai_key,
+                    base_url=openai_base.strip()  # 去除可能的空格
+                )
+                print(f"✅ OpenAI Whisper API 已启用（使用代理: {openai_base})")
+            else:
+                self.openai_client = OpenAI(api_key=openai_key)
+                print("✅ OpenAI Whisper API 已启用（官方 API）")
         else:
+            self.openai_client = None
             print("⚠️ OpenAI API Key 未配置，将使用 Gemini 进行转录")
     
     def download_video_with_ytdlp(self, video_url: str) -> str:

@@ -52,8 +52,15 @@ GEMINI_API_KEY = "AIzaSyxxxxx"
 APP_PASSWORD = "your_password"
 
 # 新增：OpenAI API Key
-OPENAI_API_KEY = "sk-proj-xxxxx"
+OPENAI_API_KEY = "sk-xxxxx"
+
+# 可选：如果使用第三方 OpenAI 代理（如 gptsapi.net）
+OPENAI_API_BASE = "https://api.gptsapi.net/v1"
 ```
+
+**注意**：
+- 如果使用官方 OpenAI API，**不需要**配置 `OPENAI_API_BASE`
+- 如果使用第三方代理（如 gptsapi.net、api2d.com 等），需要同时配置 `OPENAI_API_KEY` 和 `OPENAI_API_BASE`
 
 4. 点击 **"Save"**，应用会自动重启
 
